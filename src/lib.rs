@@ -43,6 +43,31 @@ macro_rules! bicond {
     }
 }
 
+macro_rules! unreachable {
+    () => (
+        {
+            #[cfg(not(feature = "allow-unsafe"))]
+            {
+                panic!("internal error: entered unreachable code")
+            }
+            #[cfg(feature = "allow-unsafe")]
+            {
+                unsafe { core::hint::unreachable_unchecked() }
+            }
+        }
+    );
+    ($($t:tt)+) => (
+        #[cfg(not(feature = "allow-unsafe"))]
+        {
+            panic!("internal error: entered unreachable code: {}", format_args!($($t)+))
+        }
+        #[cfg(feature = "allow-unsafe")]
+        {
+            unsafe { core::hint::unreachable_unchecked() }
+        }
+    );
+}
+
 #[repr(align(16))]
 #[repr(u8)]
 #[derive(Copy, Clone)]
@@ -465,7 +490,6 @@ impl<'r, T: Iterator> Peek<'r, T> {
     }
 
     #[inline(always)]
-    #[cfg(feature = "allow-unsafe")]
     const fn get_impl(&self) -> Option<&T::Item> {
         // SAFETY
         // 
@@ -480,16 +504,7 @@ impl<'r, T: Iterator> Peek<'r, T> {
         // are feature gated for safety pedants.
         match &self.src.peeked {
             Peeked::Peeked((elem, _)) => elem.as_ref(),
-            Peeked::Empty             => unsafe { core::hint::unreachable_unchecked() }
-        }
-    }
-
-    #[inline(always)]
-    #[cfg(not(feature = "allow-unsafe"))]
-    const fn get_impl(&self) -> Option<&T::Item> {
-        match &self.src.peeked {
-            Peeked::Peeked((elem, _)) => elem.as_ref(),
-            Peeked::Empty             => None
+            Peeked::Empty             => unreachable!()
         }
     }
 
@@ -510,7 +525,6 @@ impl<'r, T: Iterator> Peek<'r, T> {
     }
 
     #[inline(always)]
-    #[cfg(feature = "allow-unsafe")]
     fn get_mut_impl(&mut self) -> Option<&mut T::Item> {
         // SAFETY
         // 
@@ -522,16 +536,7 @@ impl<'r, T: Iterator> Peek<'r, T> {
         // kani, this invariant being violated in safe rust is not plausible.
         match &mut self.src.peeked {
             Peeked::Peeked((elem, _)) => elem.as_mut(),
-            Peeked::Empty             => unsafe { core::hint::unreachable_unchecked() }
-        }
-    }
-
-    #[inline(always)]
-    #[cfg(not(feature = "allow-unsafe"))]
-    fn get_mut_impl(&mut self) -> Option<&mut T::Item> {
-        match &mut self.src.peeked {
-            Peeked::Peeked((elem, _)) => elem.as_mut(),
-            Peeked::Empty             => None
+            Peeked::Empty             => unreachable!()
         }
     }
 
@@ -829,12 +834,7 @@ impl<'r, T: Iterator> Peek<'r, T> {
             },
             _ => {
                 // SAFETY: We are currently full, thus this path is unreachable.
-                #[cfg(feature = "allow-unsafe")] {
-                    unsafe { core::hint::unreachable_unchecked() }
-                }
-                #[cfg(not(feature = "allow-unsafe"))] {
-                    unreachable!()
-                }
+                unreachable!()
             }
         }
     }
@@ -865,10 +865,7 @@ impl<'r, T: Iterator> Peek<'r, T> {
                     second.take().unwrap()
                 }
             },
-            #[cfg(feature = "allow-unsafe")]
-            _ => unsafe { core::hint::unreachable_unchecked() },
-            #[cfg(not(feature = "allow-unsafe"))]
-            _ => unreachable!()
+            Peeked::Empty => unreachable!()
         }
     }
 
